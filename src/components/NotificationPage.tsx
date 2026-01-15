@@ -269,7 +269,7 @@ export function NotificationPage() {
                 <p 
                   className="text-sm mt-2 p-3 rounded-xl"
                   style={{ 
-                    backgroundColor: 'white',
+                    backgroundColor: 'var(--theme-card-bg)',
                     color: 'var(--theme-text)',
                     opacity: 0.9,
                   }}

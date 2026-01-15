@@ -206,7 +206,7 @@ function WriteForm({
       <div 
         className="p-6 rounded-2xl shadow-md"
         style={{
-          backgroundColor: 'white',
+          backgroundColor: 'var(--theme-card-bg)',
           border: `1px solid var(--theme-primary)33`,
         }}
       >

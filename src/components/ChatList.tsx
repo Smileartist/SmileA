@@ -3,7 +3,6 @@ import { Card } from "./ui/card";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { MessageCircle, Send, X, Heart, ArrowLeft } from "lucide-react";
-import { projectId, publicAnonKey } from "../utils/supabase/info";
 import { useTheme } from "../utils/ThemeContext";
 
 interface Message {
@@ -26,33 +25,29 @@ export function ChatList() {
   const [savedChats, setSavedChats] = useState<SavedChat[]>([]);
   const [selectedChat, setSelectedChat] = useState<SavedChat | null>(null);
   const [inputMessage, setInputMessage] = useState("");
-  const [userId] = useState(() => `user_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`);
+  const [userId] = useState(() => {
+    const savedUser = localStorage.getItem("smileArtist_user");
+    if (savedUser) {
+      return JSON.parse(savedUser).userId;
+    }
+    return `user_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+  });
 
   useEffect(() => {
     loadSavedChats();
-  }, []);
+  }, [userId]);
 
-  const loadSavedChats = async () => {
+  const loadSavedChats = () => {
     try {
-      const response = await fetch(
-        `https://${projectId}.supabase.co/functions/v1/make-server-927350a6/buddy/saved-chats?userId=${userId}`,
-        {
-          headers: {
-            Authorization: `Bearer ${publicAnonKey}`,
-          },
-        }
-      );
-      
-      const data = await response.json();
-      if (data.chats) {
-        setSavedChats(data.chats);
-      }
+      const chats = JSON.parse(localStorage.getItem(`buddy_saved_chats_${userId}`) || "[]");
+      setSavedChats(chats);
     } catch (error) {
       console.error("Error loading saved chats:", error);
+      setSavedChats([]);
     }
   };
 
-  const sendMessage = async () => {
+  const sendMessage = () => {
     if (!inputMessage.trim() || !selectedChat) return;
 
     const newMessage: Message = {
@@ -62,32 +57,64 @@ export function ChatList() {
       timestamp: Date.now(),
     };
 
-    try {
-      await fetch(
-        `https://${projectId}.supabase.co/functions/v1/make-server-927350a6/buddy/send-saved`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${publicAnonKey}`,
-          },
-          body: JSON.stringify({
-            chatId: selectedChat.id,
-            userId,
-            message: newMessage,
-          }),
-        }
-      );
+    // Update selected chat with new message
+    const updatedMessages = [...selectedChat.messages, newMessage];
+    const updatedChat = {
+      ...selectedChat,
+      messages: updatedMessages,
+      lastMessageTime: Date.now(),
+      preview: inputMessage,
+    };
 
-      // Update local state optimistically
-      setSelectedChat({
-        ...selectedChat,
-        messages: [...selectedChat.messages, newMessage],
-      });
-      setInputMessage("");
-    } catch (error) {
-      console.error("Error sending message:", error);
+    // Update in localStorage
+    const allChats = JSON.parse(localStorage.getItem(`buddy_saved_chats_${userId}`) || "[]");
+    const chatIndex = allChats.findIndex((c: SavedChat) => c.id === selectedChat.id);
+    if (chatIndex !== -1) {
+      allChats[chatIndex] = updatedChat;
+      localStorage.setItem(`buddy_saved_chats_${userId}`, JSON.stringify(allChats));
     }
+
+    // Update local state
+    setSelectedChat(updatedChat);
+    setSavedChats(allChats);
+    setInputMessage("");
+
+    // Simulate bot response
+    setTimeout(() => {
+      const responses = [
+        "It's good to hear from you again!",
+        "I'm glad you're reaching out. How have you been?",
+        "Thanks for sharing that with me.",
+        "I'm here if you need to talk more.",
+        "That sounds interesting. Tell me more.",
+      ];
+
+      const botResponse: Message = {
+        id: `msg_${Date.now()}_bot`,
+        text: responses[Math.floor(Math.random() * responses.length)],
+        sender: "other",
+        timestamp: Date.now(),
+      };
+
+      const newMessages = [...updatedMessages, botResponse];
+      const chatWithBotResponse = {
+        ...updatedChat,
+        messages: newMessages,
+        lastMessageTime: Date.now(),
+        preview: botResponse.text,
+      };
+
+      // Update in localStorage
+      const updatedAllChats = JSON.parse(localStorage.getItem(`buddy_saved_chats_${userId}`) || "[]");
+      const idx = updatedAllChats.findIndex((c: SavedChat) => c.id === selectedChat.id);
+      if (idx !== -1) {
+        updatedAllChats[idx] = chatWithBotResponse;
+        localStorage.setItem(`buddy_saved_chats_${userId}`, JSON.stringify(updatedAllChats));
+      }
+
+      setSelectedChat(chatWithBotResponse);
+      setSavedChats(updatedAllChats);
+    }, 1500);
   };
 
   if (selectedChat) {

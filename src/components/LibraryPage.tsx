@@ -203,7 +203,7 @@ Through filters and facades we see...`,
         <div 
           className="p-4 rounded-2xl shadow-sm"
           style={{
-            backgroundColor: 'white',
+            backgroundColor: 'var(--theme-card-bg)',
             border: `1px solid var(--theme-primary)33`,
           }}
         >
@@ -216,7 +216,7 @@ Through filters and facades we see...`,
         <div 
           className="p-4 rounded-2xl shadow-sm"
           style={{
-            backgroundColor: 'white',
+            backgroundColor: 'var(--theme-card-bg)',
             border: `1px solid var(--theme-primary)33`,
           }}
         >
@@ -229,7 +229,7 @@ Through filters and facades we see...`,
         <div 
           className="p-4 rounded-2xl shadow-sm"
           style={{
-            backgroundColor: 'white',
+            backgroundColor: 'var(--theme-card-bg)',
             border: `1px solid var(--theme-primary)33`,
           }}
         >
@@ -242,7 +242,7 @@ Through filters and facades we see...`,
         <div 
           className="p-4 rounded-2xl shadow-sm"
           style={{
-            backgroundColor: 'white',
+            backgroundColor: 'var(--theme-card-bg)',
             border: `1px solid var(--theme-primary)33`,
           }}
         >
@@ -327,7 +327,7 @@ Through filters and facades we see...`,
                 key={index}
                 className="text-left p-6 rounded-2xl shadow-md transition-all hover:shadow-lg"
                 style={{
-                  backgroundColor: 'white',
+                  backgroundColor: 'var(--theme-card-bg)',
                   border: `1px solid var(--theme-primary)33`,
                 }}
               >

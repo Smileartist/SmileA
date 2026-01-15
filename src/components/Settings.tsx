@@ -72,25 +72,38 @@ export function Settings({ onLogout, username }: SettingsProps) {
   }, [profileVisibility, showEmail, allowMessages, showActivity]);
 
   useEffect(() => {
-    localStorage.setItem("app_darkMode", darkMode.toString());
     localStorage.setItem("app_notifications", notifications.toString());
     localStorage.setItem("app_autoDownload", autoDownload.toString());
     localStorage.setItem("app_dataUsage", dataUsage);
     localStorage.setItem("app_language", language);
+  }, [notifications, autoDownload, dataUsage, language]);
 
-    // Apply dark mode
+  // Handle dark mode separately to avoid infinite loop
+  useEffect(() => {
+    localStorage.setItem("app_darkMode", darkMode.toString());
+
+    // Apply or remove dark class from document root
+    const root = document.documentElement;
     if (darkMode) {
+      root.classList.add('dark');
+      // Also update theme context for custom colors
       updateTheme({
         backgroundColor: "#1a1515",
         textColor: "#f5e8e0",
-        primaryColor: "#d4756f",
-        secondaryColor: "#c9a28f",
-        accentColor: "#2d2424",
+        accentColor: "#3d2f2f",
+        chatOtherMessageBg: "#2d2424",
       });
     } else {
-      resetTheme();
+      root.classList.remove('dark');
+      // Restore light theme colors while keeping other customizations
+      updateTheme({
+        backgroundColor: "#fef9f5",
+        textColor: "#2d2424",
+        accentColor: "#fce4da",
+        chatOtherMessageBg: "#ffffff",
+      });
     }
-  }, [darkMode, notifications, autoDownload, dataUsage, language]);
+  }, [darkMode]);
 
   const handleClearData = () => {
     if (confirm("Are you sure you want to clear all app data? This action cannot be undone.")) {
@@ -110,11 +123,23 @@ export function Settings({ onLogout, username }: SettingsProps) {
   };
 
   const SettingSection = ({ title, icon: Icon, children }: any) => (
-    <Card className="mb-4 bg-white/80 backdrop-blur-sm border-2 border-[#d4756f]/20 rounded-2xl overflow-hidden">
-      <div className="p-4 bg-gradient-to-r from-[#fce4da]/30 to-[#f5e8e0]/30 border-b border-[#d4756f]/10">
+    <Card 
+      className="mb-4 backdrop-blur-sm border-2 rounded-2xl overflow-hidden"
+      style={{
+        backgroundColor: darkMode ? 'rgba(45, 36, 36, 0.8)' : 'rgba(255, 255, 255, 0.8)',
+        borderColor: darkMode ? 'rgba(212, 117, 111, 0.3)' : 'rgba(212, 117, 111, 0.2)',
+      }}
+    >
+      <div 
+        className="p-4 border-b"
+        style={{
+          backgroundColor: darkMode ? 'rgba(61, 47, 47, 0.3)' : 'rgba(252, 228, 218, 0.3)',
+          borderColor: darkMode ? 'rgba(212, 117, 111, 0.2)' : 'rgba(212, 117, 111, 0.1)',
+        }}
+      >
         <div className="flex items-center gap-3">
-          <Icon className="w-5 h-5 text-[#d4756f]" />
-          <h3 className="text-[#2d2424]">{title}</h3>
+          <Icon className="w-5 h-5" style={{ color: '#d4756f' }} />
+          <h3 style={{ color: darkMode ? '#f5e8e0' : '#2d2424' }}>{title}</h3>
         </div>
       </div>
       <div className="p-4 space-y-4">{children}</div>
@@ -124,9 +149,9 @@ export function Settings({ onLogout, username }: SettingsProps) {
   const SettingRow = ({ label, description, children }: any) => (
     <div className="flex items-center justify-between py-2">
       <div className="flex-1">
-        <p className="text-sm text-[#2d2424]">{label}</p>
+        <p className="text-sm" style={{ color: darkMode ? '#f5e8e0' : '#2d2424' }}>{label}</p>
         {description && (
-          <p className="text-xs text-[#8a7c74] mt-0.5">{description}</p>
+          <p className="text-xs mt-0.5" style={{ color: darkMode ? '#c9a28f' : '#8a7c74' }}>{description}</p>
         )}
       </div>
       <div>{children}</div>
@@ -151,8 +176,8 @@ export function Settings({ onLogout, username }: SettingsProps) {
   return (
     <div className="max-w-4xl mx-auto pb-8">
       <div className="mb-6">
-        <h2 className="text-[#2d2424] mb-2">Settings</h2>
-        <p className="text-[#8a7c74] text-sm md:text-base">
+        <h2 className="mb-2" style={{ color: darkMode ? '#f5e8e0' : '#2d2424' }}>Settings</h2>
+        <p className="text-sm md:text-base" style={{ color: darkMode ? '#c9a28f' : '#8a7c74' }}>
           Manage your account, privacy, and app preferences
         </p>
       </div>
@@ -164,8 +189,8 @@ export function Settings({ onLogout, username }: SettingsProps) {
             {username.charAt(0).toUpperCase()}
           </div>
           <div>
-            <p className="text-[#2d2424]">{username}</p>
-            <p className="text-xs text-[#8a7c74]">Smile Artist Member</p>
+            <p style={{ color: darkMode ? '#f5e8e0' : '#2d2424' }}>{username}</p>
+            <p className="text-xs" style={{ color: darkMode ? '#c9a28f' : '#8a7c74' }}>Smile Artist Member</p>
           </div>
         </div>
       </SettingSection>
@@ -179,7 +204,12 @@ export function Settings({ onLogout, username }: SettingsProps) {
           <select
             value={profileVisibility}
             onChange={(e) => setProfileVisibility(e.target.value)}
-            className="px-3 py-1.5 border border-[#d4756f]/20 rounded-lg text-sm bg-white text-[#2d2424] focus:border-[#d4756f] focus:outline-none"
+            className="px-3 py-1.5 border rounded-lg text-sm focus:outline-none"
+            style={{
+              backgroundColor: darkMode ? '#2d2424' : 'white',
+              color: darkMode ? '#f5e8e0' : '#2d2424',
+              borderColor: darkMode ? 'rgba(212, 117, 111, 0.3)' : 'rgba(212, 117, 111, 0.2)',
+            }}
           >
             <option value="public">Public</option>
             <option value="friends">Friends Only</option>
@@ -238,7 +268,12 @@ export function Settings({ onLogout, username }: SettingsProps) {
           <select
             value={dataUsage}
             onChange={(e) => setDataUsage(e.target.value)}
-            className="px-3 py-1.5 border border-[#d4756f]/20 rounded-lg text-sm bg-white text-[#2d2424] focus:border-[#d4756f] focus:outline-none"
+            className="px-3 py-1.5 border rounded-lg text-sm focus:outline-none"
+            style={{
+              backgroundColor: darkMode ? '#2d2424' : 'white',
+              color: darkMode ? '#f5e8e0' : '#2d2424',
+              borderColor: darkMode ? 'rgba(212, 117, 111, 0.3)' : 'rgba(212, 117, 111, 0.2)',
+            }}
           >
             <option value="low">Low</option>
             <option value="normal">Normal</option>
@@ -271,7 +306,12 @@ export function Settings({ onLogout, username }: SettingsProps) {
           <select
             value={language}
             onChange={(e) => setLanguage(e.target.value)}
-            className="px-3 py-1.5 border border-[#d4756f]/20 rounded-lg text-sm bg-white text-[#2d2424] focus:border-[#d4756f] focus:outline-none"
+            className="px-3 py-1.5 border rounded-lg text-sm focus:outline-none"
+            style={{
+              backgroundColor: darkMode ? '#2d2424' : 'white',
+              color: darkMode ? '#f5e8e0' : '#2d2424',
+              borderColor: darkMode ? 'rgba(212, 117, 111, 0.3)' : 'rgba(212, 117, 111, 0.2)',
+            }}
           >
             <option value="english">English</option>
             <option value="spanish">Español</option>
@@ -287,7 +327,12 @@ export function Settings({ onLogout, username }: SettingsProps) {
         <Button
           onClick={onLogout}
           variant="outline"
-          className="w-full justify-start text-[#2d2424] border-[#d4756f]/20 hover:bg-[#fce4da]/30 rounded-xl mb-2"
+          className="w-full justify-start rounded-xl mb-2"
+          style={{
+            color: darkMode ? '#f5e8e0' : '#2d2424',
+            borderColor: darkMode ? 'rgba(212, 117, 111, 0.3)' : 'rgba(212, 117, 111, 0.2)',
+            backgroundColor: 'transparent',
+          }}
         >
           <LogOut className="w-4 h-4 mr-2" />
           Logout
@@ -304,9 +349,15 @@ export function Settings({ onLogout, username }: SettingsProps) {
       </SettingSection>
 
       {/* App Info */}
-      <Card className="mt-6 p-4 bg-white/80 backdrop-blur-sm border-2 border-[#d4756f]/20 rounded-2xl text-center">
-        <p className="text-xs text-[#8a7c74]">Smile Artist v1.0.0</p>
-        <p className="text-xs text-[#8a7c74] mt-1">
+      <Card 
+        className="mt-6 p-4 backdrop-blur-sm border-2 rounded-2xl text-center"
+        style={{
+          backgroundColor: darkMode ? 'rgba(45, 36, 36, 0.8)' : 'rgba(255, 255, 255, 0.8)',
+          borderColor: darkMode ? 'rgba(212, 117, 111, 0.3)' : 'rgba(212, 117, 111, 0.2)',
+        }}
+      >
+        <p className="text-xs" style={{ color: darkMode ? '#c9a28f' : '#8a7c74' }}>Smile Artist v1.0.0</p>
+        <p className="text-xs mt-1" style={{ color: darkMode ? '#c9a28f' : '#8a7c74' }}>
           A safe space for poetry and connections
         </p>
       </Card>

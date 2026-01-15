@@ -100,4 +100,9 @@ function applyThemeToDocument(theme: ThemeConfig) {
   root.style.setProperty("--theme-border-radius", theme.borderRadius);
   root.style.setProperty("--theme-chat-my-bg", theme.chatMyMessageBg);
   root.style.setProperty("--theme-chat-other-bg", theme.chatOtherMessageBg);
+  
+  // Set card background based on whether we're in dark mode
+  // Check if background is dark (assuming dark backgrounds have low luminance)
+  const isDark = root.classList.contains('dark');
+  root.style.setProperty("--theme-card-bg", isDark ? "#2d2424" : "#ffffff");
 }

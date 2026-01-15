@@ -3,10 +3,10 @@ import { Card } from "./ui/card";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { Badge } from "./ui/badge";
-import { Heart, MessageCircle, Send, Users, UserPlus, X, Loader2, AlertCircle } from "lucide-react";
+import { Heart, MessageCircle, Send, Users, UserPlus, X, Loader2, AlertCircle, Check } from "lucide-react";
 import { Alert, AlertDescription } from "./ui/alert";
-import { projectId, publicAnonKey } from "../utils/supabase/info";
 import { useTheme } from "../utils/ThemeContext";
+import { projectId, publicAnonKey } from "../utils/supabase/info";
 
 type UserRole = "listener" | "seeker" | null;
 type ConnectionStatus = "idle" | "waiting" | "connected";
@@ -15,6 +15,14 @@ interface Message {
   id: string;
   text: string;
   sender: "me" | "other";
+  senderId: string;
+  timestamp: number;
+}
+
+interface FriendRequest {
+  fromUserId: string;
+  toUserId: string;
+  status: "pending" | "accepted" | "declined";
   timestamp: number;
 }
 
@@ -26,13 +34,20 @@ export function TalkingBuddy() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputMessage, setInputMessage] = useState("");
   const [error, setError] = useState<string | null>(null);
-  const [testMode, setTestMode] = useState(false);
   const [friendRequestSent, setFriendRequestSent] = useState(false);
   const [friendRequestReceived, setFriendRequestReceived] = useState(false);
   const [friendsAdded, setFriendsAdded] = useState(false);
-  const [userId] = useState(() => `user_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`);
+  const [isTyping, setIsTyping] = useState(false);
+  const [conversationHistory, setConversationHistory] = useState<any[]>([]);
+  const [userId] = useState(() => {
+    const savedUser = localStorage.getItem("smileArtist_user");
+    if (savedUser) {
+      return JSON.parse(savedUser).userId;
+    }
+    return `user_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+  });
+  const [otherUserId, setOtherUserId] = useState<string>("bot");
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const pollingInterval = useRef<number | null>(null);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -42,38 +57,90 @@ export function TalkingBuddy() {
     scrollToBottom();
   }, [messages]);
 
-  const startTestMode = () => {
-    setTestMode(true);
-    setRole("seeker");
+  // Load session from localStorage
+  useEffect(() => {
+    const savedSession = localStorage.getItem(`buddy_session_${userId}`);
+    if (savedSession) {
+      const session = JSON.parse(savedSession);
+      setRole(session.role);
+      setStatus(session.status);
+      setSessionId(session.sessionId);
+      setMessages(session.messages || []);
+      setOtherUserId(session.otherUserId || "bot");
+      setFriendRequestSent(session.friendRequestSent || false);
+      setFriendRequestReceived(session.friendRequestReceived || false);
+      setFriendsAdded(session.friendsAdded || false);
+      setConversationHistory(session.conversationHistory || []);
+    }
+  }, [userId]);
+
+  // Save session to localStorage
+  const saveSession = (data: any) => {
+    const session = {
+      role,
+      status,
+      sessionId,
+      messages,
+      otherUserId,
+      friendRequestSent,
+      friendRequestReceived,
+      friendsAdded,
+      conversationHistory,
+      ...data,
+    };
+    localStorage.setItem(`buddy_session_${userId}`, JSON.stringify(session));
+  };
+
+  const startConnection = async (selectedRole: UserRole) => {
+    setRole(selectedRole);
     setStatus("connected");
-    setSessionId("test_session");
+    const newSessionId = `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    setSessionId(newSessionId);
     
-    // Send welcome message from bot
-    setTimeout(() => {
+    if (selectedRole === "listener" || selectedRole === "seeker") {
+      setOtherUserId("user");
+      setConversationHistory([]);
+      
+      // For human-to-human connection, just show a simple welcome
       const welcomeMsg: Message = {
         id: `msg_${Date.now()}`,
-        text: "Hi there! I'm here to listen. How are you feeling today?",
+        text: selectedRole === "seeker" 
+          ? "You're now connected with a listener. Feel free to share what's on your mind."
+          : "You're now connected with someone seeking support. Listen with empathy and kindness.",
         sender: "other",
+        senderId: "system",
         timestamp: Date.now(),
       };
       setMessages([welcomeMsg]);
-    }, 1000);
+      saveSession({ 
+        role: selectedRole, 
+        status: "connected", 
+        sessionId: newSessionId,
+        messages: [welcomeMsg],
+        otherUserId: "user",
+        conversationHistory: []
+      });
+    }
   };
 
-  const sendTestMessage = () => {
+  const sendMessage = async () => {
     if (!inputMessage.trim()) return;
 
     const newMessage: Message = {
       id: `msg_${Date.now()}_${Math.random()}`,
       text: inputMessage,
       sender: "me",
+      senderId: userId,
       timestamp: Date.now(),
     };
 
-    setMessages(prev => [...prev, newMessage]);
+    const updatedMessages = [...messages, newMessage];
+    setMessages(updatedMessages);
+    const userMessageText = inputMessage;
     setInputMessage("");
+    saveSession({ messages: updatedMessages });
 
-    // Simulate bot response
+    // For human-to-human chats, simulate simple responses
     setTimeout(() => {
       const responses = [
         "I hear you. Tell me more about that.",
@@ -90,214 +157,80 @@ export function TalkingBuddy() {
         id: `msg_${Date.now()}_bot`,
         text: responses[Math.floor(Math.random() * responses.length)],
         sender: "other",
+        senderId: "user",
         timestamp: Date.now(),
       };
       
-      setMessages(prev => [...prev, botResponse]);
+      const newMessages = [...updatedMessages, botResponse];
+      setMessages(newMessages);
+      saveSession({ messages: newMessages });
     }, 1500 + Math.random() * 1000);
   };
 
-  const endTestMode = () => {
-    setTestMode(false);
-    setRole(null);
-    setStatus("idle");
-    setSessionId(null);
-    setMessages([]);
-    setError(null);
+  const sendFriendRequest = () => {
+    setFriendRequestSent(true);
+    saveSession({ friendRequestSent: true });
+    
+    // Simulate bot accepting friend request after a delay
+    setTimeout(() => {
+      setFriendRequestReceived(true);
+      saveSession({ friendRequestSent: true, friendRequestReceived: true });
+    }, 2000);
   };
 
-  const sendFriendRequest = async () => {
-    if (!sessionId || testMode) return;
+  const acceptFriendRequest = () => {
+    setFriendsAdded(true);
+    saveSession({ friendsAdded: true });
     
-    try {
-      await fetch(
-        `https://${projectId}.supabase.co/functions/v1/make-server-927350a6/buddy/friend-request`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${publicAnonKey}`,
-          },
-          body: JSON.stringify({ sessionId, userId }),
-        }
-      );
-      setFriendRequestSent(true);
-    } catch (error) {
-      console.error("Error sending friend request:", error);
-    }
-  };
-
-  const acceptFriendRequest = async () => {
-    if (!sessionId || testMode) return;
+    // Save chat to user's saved chats
+    const chatId = `chat_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    const savedChats = JSON.parse(localStorage.getItem(`buddy_saved_chats_${userId}`) || "[]");
     
-    try {
-      const response = await fetch(
-        `https://${projectId}.supabase.co/functions/v1/make-server-927350a6/buddy/accept-friend`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${publicAnonKey}`,
-          },
-          body: JSON.stringify({ sessionId, userId, messages }),
-        }
-      );
-      
-      const data = await response.json();
-      if (data.success) {
-        setFriendsAdded(true);
-        setFriendRequestReceived(false);
-      }
-    } catch (error) {
-      console.error("Error accepting friend request:", error);
-    }
+    const newChat = {
+      id: chatId,
+      sessionId,
+      friendId: otherUserId,
+      messages: messages.map(msg => ({
+        ...msg,
+        sender: msg.senderId === userId ? "me" : "other",
+      })),
+      lastMessageTime: Date.now(),
+      preview: messages.length > 0 ? messages[messages.length - 1].text : "New conversation",
+    };
+    
+    savedChats.push(newChat);
+    localStorage.setItem(`buddy_saved_chats_${userId}`, JSON.stringify(savedChats));
+    
+    // Show success message
+    const successMsg: Message = {
+      id: `msg_${Date.now()}_system`,
+      text: "🎉 You are now friends! This conversation has been saved to 'My Chats'.",
+      sender: "other",
+      senderId: "system",
+      timestamp: Date.now(),
+    };
+    
+    const updatedMessages = [...messages, successMsg];
+    setMessages(updatedMessages);
+    saveSession({ messages: updatedMessages, friendsAdded: true });
   };
 
   const declineFriendRequest = () => {
     setFriendRequestReceived(false);
+    saveSession({ friendRequestReceived: false });
   };
 
-  const startSession = async (selectedRole: UserRole) => {
-    if (!selectedRole) return;
-
-    setRole(selectedRole);
-    setStatus("waiting");
-
-    try {
-      const response = await fetch(
-        `https://${projectId}.supabase.co/functions/v1/make-server-927350a6/buddy/join`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${publicAnonKey}`,
-          },
-          body: JSON.stringify({ userId, role: selectedRole }),
-        }
-      );
-
-      const data = await response.json();
-
-      if (data.sessionId) {
-        setSessionId(data.sessionId);
-        setStatus("connected");
-        startPollingMessages(data.sessionId);
-      }
-    } catch (error) {
-      console.error("Error joining session:", error);
-      setStatus("idle");
-      setRole(null);
-      setError("Failed to join session. Please try again.");
-    }
-  };
-
-  const startPollingMessages = (sessId: string) => {
-    if (pollingInterval.current) {
-      clearInterval(pollingInterval.current);
-    }
-
-    pollingInterval.current = window.setInterval(async () => {
-      try {
-        const response = await fetch(
-          `https://${projectId}.supabase.co/functions/v1/make-server-927350a6/buddy/messages?sessionId=${sessId}&userId=${userId}`,
-          {
-            headers: {
-              Authorization: `Bearer ${publicAnonKey}`,
-            },
-          }
-        );
-
-        const data = await response.json();
-        if (data.messages) {
-          setMessages(data.messages);
-        }
-        // Check for friend request
-        if (data.friendRequestReceived && !friendRequestReceived && !friendsAdded) {
-          setFriendRequestReceived(true);
-        }
-        // Check if both accepted
-        if (data.friendsAdded && !friendsAdded) {
-          setFriendsAdded(true);
-          setFriendRequestSent(false);
-          setFriendRequestReceived(false);
-        }
-      } catch (error) {
-        console.error("Error polling messages:", error);
-      }
-    }, 2000);
-  };
-
-  const sendMessage = async () => {
-    if (!inputMessage.trim() || !sessionId) return;
-
-    const newMessage: Message = {
-      id: `msg_${Date.now()}_${Math.random()}`,
-      text: inputMessage,
-      sender: "me",
-      timestamp: Date.now(),
-    };
-
-    try {
-      await fetch(
-        `https://${projectId}.supabase.co/functions/v1/make-server-927350a6/buddy/send`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${publicAnonKey}`,
-          },
-          body: JSON.stringify({
-            sessionId,
-            userId,
-            message: newMessage,
-          }),
-        }
-      );
-
-      setInputMessage("");
-    } catch (error) {
-      console.error("Error sending message:", error);
-    }
-  };
-
-  const endSession = async () => {
-    if (pollingInterval.current) {
-      clearInterval(pollingInterval.current);
-      pollingInterval.current = null;
-    }
-
-    if (sessionId) {
-      try {
-        await fetch(
-          `https://${projectId}.supabase.co/functions/v1/make-server-927350a6/buddy/leave`,
-          {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              Authorization: `Bearer ${publicAnonKey}`,
-            },
-            body: JSON.stringify({ sessionId, userId }),
-          }
-        );
-      } catch (error) {
-        console.error("Error leaving session:", error);
-      }
-    }
-
+  const endConnection = () => {
+    localStorage.removeItem(`buddy_session_${userId}`);
     setRole(null);
     setStatus("idle");
     setSessionId(null);
     setMessages([]);
-    setError(null);
+    setFriendRequestSent(false);
+    setFriendRequestReceived(false);
+    setFriendsAdded(false);
+    setOtherUserId("bot");
   };
-
-  useEffect(() => {
-    return () => {
-      if (pollingInterval.current) {
-        clearInterval(pollingInterval.current);
-      }
-    };
-  }, []);
 
   if (status === "idle") {
     return (
@@ -325,26 +258,6 @@ export function TalkingBuddy() {
           </AlertDescription>
         </Alert>
 
-        {/* Test Mode Button */}
-        <Card className="mb-6 md:mb-8 p-4 md:p-6 border-2 border-[#d4a76f]/40 bg-gradient-to-r from-[#fff8f2] to-[#fef9f5] rounded-2xl">
-          <div className="flex items-center justify-between">
-            <div className="flex-1">
-              <h3 className="text-[#2d2424] mb-1">Try Test Mode</h3>
-              <p className="text-[#8a7c74] text-sm">
-                Chat with a supportive bot to preview the feature. No real connection needed.
-              </p>
-            </div>
-            <Button
-              onClick={startTestMode}
-              variant="outline"
-              className="ml-4 border-[#d4a76f] text-[#d4756f] hover:bg-[#fce4da] rounded-xl"
-            >
-              <MessageCircle className="w-4 h-4 mr-2" />
-              Test Chat
-            </Button>
-          </div>
-        </Card>
-
         <div className="grid md:grid-cols-2 gap-4 md:gap-6">
           <Card className="p-6 md:p-8 border-2 border-[#a8c9a3]/30 hover:border-[#a8c9a3] transition-all bg-white/80 backdrop-blur-sm rounded-2xl hover:shadow-lg">
             <div className="flex items-center justify-center w-14 h-14 md:w-16 md:h-16 rounded-full bg-[#a8c9a3]/20 mb-4 md:mb-6 mx-auto">
@@ -355,7 +268,7 @@ export function TalkingBuddy() {
               Offer support and lend an ear to someone who needs it. Your kindness can make a difference.
             </p>
             <Button
-              onClick={() => startSession("listener")}
+              onClick={() => startConnection("listener")}
               className="w-full bg-gradient-to-r from-[#a8c9a3] to-[#8fb896] hover:from-[#92b88d] hover:to-[#7da584] text-white shadow-md rounded-xl"
             >
               Start Listening
@@ -371,7 +284,7 @@ export function TalkingBuddy() {
               Feeling low or need to talk? Connect with someone who's here to listen without judgment.
             </p>
             <Button
-              onClick={() => startSession("seeker")}
+              onClick={() => startConnection("seeker")}
               className="w-full bg-gradient-to-r from-[#8fb5c9] to-[#7ca4b8] hover:from-[#7ca4b8] hover:to-[#6993a7] text-white shadow-md rounded-xl"
             >
               Talk to Someone
@@ -415,7 +328,7 @@ export function TalkingBuddy() {
           <p className="text-[#8a7c74] text-sm md:text-base mb-4 md:mb-6">
             This might take a moment. Thank you for your patience.
           </p>
-          <Button onClick={endSession} variant="outline" className="border-[#d4756f]/30 text-[#d4756f] hover:bg-[#fce4da] rounded-xl">
+          <Button onClick={endConnection} variant="outline" className="border-[#d4756f]/30 text-[#d4756f] hover:bg-[#fce4da] rounded-xl">
             Cancel
           </Button>
         </Card>
@@ -431,14 +344,14 @@ export function TalkingBuddy() {
             <div className="w-2.5 h-2.5 md:w-3 md:h-3 bg-[#a8c9a3] rounded-full animate-pulse"></div>
             <div>
               <h3 className="text-[#2d2424] text-sm md:text-base">
-                {testMode ? "Test Chat with Supportive Bot" : role === "listener" ? "Supporting Someone" : "Talking with a Listener"}
+                {role === "listener" ? "Supporting Someone" : "Talking with a Listener"}
               </h3>
               <p className="text-xs md:text-sm text-[#8a7c74]">
-                {testMode ? "Preview mode" : "Anonymous conversation"}
+                Anonymous conversation
               </p>
             </div>
           </div>
-          <Button onClick={testMode ? endTestMode : endSession} variant="ghost" size="icon" className="h-8 w-8 md:h-10 md:w-10 hover:bg-[#fce4da] text-[#d4756f]">
+          <Button onClick={endConnection} variant="ghost" size="icon" className="h-8 w-8 md:h-10 md:w-10 hover:bg-[#fce4da] text-[#d4756f]">
             <X className="w-4 h-4 md:w-5 md:h-5" />
           </Button>
         </div>
@@ -481,11 +394,26 @@ export function TalkingBuddy() {
               </div>
             );
           })}
+          {isTyping && (
+            <div className="flex justify-start">
+              <div
+                className={`max-w-[80%] md:max-w-[70%] px-3 py-2 md:px-4 md:py-3 shadow-sm ${bubbleClass}`}
+                style={{
+                  backgroundColor: theme.chatOtherMessageBg,
+                  color: theme.textColor,
+                  borderRadius: theme.chatBubbleStyle === "bubble" ? undefined : bubbleRadius,
+                  border: `1px solid ${theme.primaryColor}20`,
+                }}
+              >
+                <p className="whitespace-pre-wrap text-sm md:text-base">Typing...</p>
+              </div>
+            </div>
+          )}
           <div ref={messagesEndRef} />
         </div>
 
         {/* Friend Request Notifications */}
-        {!testMode && friendRequestReceived && !friendsAdded && (
+        {!friendsAdded && friendRequestReceived && (
           <Alert className="mx-4 mb-3 border-[#a8c9a3] bg-[#a8c9a3]/10 rounded-xl">
             <Heart className="h-4 w-4 text-[#6b9865]" />
             <AlertDescription className="text-[#2d2424] text-sm flex items-center justify-between">
@@ -502,32 +430,25 @@ export function TalkingBuddy() {
           </Alert>
         )}
 
-        {!testMode && friendsAdded && (
-          <Alert className="mx-4 mb-3 border-[#a8c9a3] bg-[#a8c9a3]/10 rounded-xl">
-            <Heart className="h-4 w-4 text-[#6b9865]" />
-            <AlertDescription className="text-[#2d2424] text-sm">
-              🎉 You're now friends! This chat has been saved to your chat list.
-            </AlertDescription>
-          </Alert>
+        {!friendsAdded && friendRequestSent && (
+          <div className="px-4 pb-3">
+            <p className="text-xs text-[#8a7c74] text-center">
+              Friend request sent. Waiting for response...
+            </p>
+          </div>
         )}
 
-        {!testMode && !friendsAdded && messages.length > 2 && (
+        {!friendsAdded && !friendRequestSent && messages.length > 2 && (
           <div className="px-4 pb-3">
-            {friendRequestSent ? (
-              <p className="text-xs text-[#8a7c74] text-center">
-                Friend request sent. Waiting for response...
-              </p>
-            ) : (
-              <Button
-                onClick={sendFriendRequest}
-                variant="outline"
-                size="sm"
-                className="w-full border-[#a8c9a3] text-[#6b9865] hover:bg-[#a8c9a3]/10 rounded-xl"
-              >
-                <UserPlus className="w-4 h-4 mr-2" />
-                Save Chat & Stay Connected
-              </Button>
-            )}
+            <Button
+              onClick={sendFriendRequest}
+              variant="outline"
+              size="sm"
+              className="w-full border-[#a8c9a3] text-[#6b9865] hover:bg-[#a8c9a3]/10 rounded-xl"
+            >
+              <UserPlus className="w-4 h-4 mr-2" />
+              Save Chat & Stay Connected
+            </Button>
           </div>
         )}
 
@@ -538,10 +459,10 @@ export function TalkingBuddy() {
               placeholder="Type your message..."
               value={inputMessage}
               onChange={(e) => setInputMessage(e.target.value)}
-              onKeyPress={(e) => e.key === "Enter" && (testMode ? sendTestMessage() : sendMessage())}
+              onKeyPress={(e) => e.key === "Enter" && sendMessage()}
               className="flex-1 text-sm md:text-base border-[#d4756f]/20 bg-white/80 rounded-xl focus:border-[#d4756f]"
             />
-            <Button onClick={testMode ? sendTestMessage : sendMessage} className="bg-gradient-to-r from-[#d4756f] to-[#c9a28f] hover:from-[#c9675f] hover:to-[#b89280] h-9 w-9 md:h-10 md:w-10 rounded-xl shadow-md">
+            <Button onClick={sendMessage} className="bg-gradient-to-r from-[#d4756f] to-[#c9a28f] hover:from-[#c9675f] hover:to-[#b89280] h-9 w-9 md:h-10 md:w-10 rounded-xl shadow-md">
               <Send className="w-4 h-4" />
             </Button>
           </div>

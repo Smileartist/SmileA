@@ -314,7 +314,7 @@ In nature's gentle, fading trust.`,
             <div 
               className="rounded-2xl p-6 shadow-md"
               style={{
-                backgroundColor: 'white',
+                backgroundColor: 'var(--theme-card-bg)',
                 border: `1px solid var(--theme-primary)33`,
               }}
             >

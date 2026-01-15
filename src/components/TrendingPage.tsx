@@ -301,7 +301,7 @@ another chance waits`,
           <div 
             className="rounded-2xl p-5 shadow-md"
             style={{
-              backgroundColor: 'white',
+              backgroundColor: 'var(--theme-card-bg)',
               border: `1px solid var(--theme-primary)33`,
             }}
           >
@@ -353,7 +353,7 @@ another chance waits`,
           <div 
             className="rounded-2xl p-5 shadow-md"
             style={{
-              backgroundColor: 'white',
+              backgroundColor: 'var(--theme-card-bg)',
               border: `1px solid var(--theme-primary)33`,
             }}
           >

@@ -18,10 +18,10 @@ export function Navigation({ activeView, onViewChange }: NavigationProps) {
 
   return (
     <nav 
-      className="hidden md:flex fixed left-0 top-0 h-screen w-64 border-r backdrop-blur-md p-6 flex-col shadow-lg"
+      className="hidden md:flex fixed left-0 top-0 h-screen w-64 border-r backdrop-blur-md p-6 flex-col shadow-lg overflow-y-auto"
       style={{
         borderColor: 'var(--theme-primary)' + '33',
-        backgroundColor: 'white',
+        backgroundColor: 'var(--theme-card-bg)',
         opacity: 0.95,
       }}
     >
@@ -162,7 +162,7 @@ export function Navigation({ activeView, onViewChange }: NavigationProps) {
       </div>
 
       <Button 
-        className="w-full mt-4 text-white shadow-md rounded-xl"
+        className="w-full mt-4 mb-2 text-white shadow-md rounded-xl"
         style={{
           background: `linear-gradient(to right, var(--theme-primary), var(--theme-secondary))`,
         }}

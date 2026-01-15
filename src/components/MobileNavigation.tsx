@@ -12,7 +12,6 @@ export function MobileNavigation({ activeView, onViewChange }: MobileNavigationP
     { id: "buddy", label: "Buddy", icon: Heart },
     { id: "chats", label: "Chats", icon: MessageCircle },
     { id: "profile", label: "Profile", icon: User },
-    { id: "settings", label: "Settings", icon: SettingsIcon },
   ];
 
   return (
@@ -23,7 +22,7 @@ export function MobileNavigation({ activeView, onViewChange }: MobileNavigationP
         borderColor: 'var(--theme-primary)' + '33',
       }}
     >
-      <div className="grid grid-cols-6 h-16">
+      <div className="grid grid-cols-5 h-16">
         {navItems.map((item) => {
           const Icon = item.icon;
           return (
